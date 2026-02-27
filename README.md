@@ -1,6 +1,6 @@
 # 🏏 IPL Cricket Data Analysis Project
 
-> **Resume-ready end-to-end data analysis of the Indian Premier League (2008–2023)**
+> **End-to-end data analysis of the Indian Premier League (2008–2023)**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://python.org)
 [![Pandas](https://img.shields.io/badge/Pandas-2.0+-green)](https://pandas.pydata.org)
@@ -138,17 +138,7 @@ After running all scripts, the `output/` folder will contain:
 
 ---
 
-## 📝 Resume Description (Copy-Paste Ready)
 
-```
-IPL Cricket Data Analysis | Python · Pandas · SQL · Power BI · Matplotlib
-• Performed end-to-end EDA on 950+ IPL matches (2008–2023) using Python and Pandas
-• Analyzed team win rates, player performance, toss impact & venue scoring patterns
-• Applied chi-square statistical test — found toss NOT significant (p=0.09)
-• Key insight: Avg 1st innings score rose 16% over 16 seasons (153→178)
-• Built interactive HTML dashboard and Power BI report for stakeholder presentation
-• Exported findings to Excel workbook with formatted tables and charts
-```
 
 ---
 
@@ -161,4 +151,3 @@ Built this project to demonstrate data analysis skills for roles in:
 
 ---
 
-*Dataset used for educational/portfolio purposes. IPL data publicly available on Kaggle.*
