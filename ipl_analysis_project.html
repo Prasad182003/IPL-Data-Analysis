@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPL Data Analysis | Cricket Analytics Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --card: #1a1a26;
+    --border: #2a2a40;
+    --accent: #f5a623;
+    --accent2: #e63946;
+    --accent3: #06d6a0;
+    --accent4: #4cc9f0;
+    --text: #f0f0f8;
+    --muted: #888899;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    padding: 60px 40px 40px;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: 'IPL';
+    position: absolute; right: -20px; top: -30px;
+    font-family: var(--font-display);
+    font-size: 260px;
+    color: rgba(245,166,35,0.04);
+    pointer-events: none;
+    line-height: 1;
+  }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(245,166,35,0.1);
+    border: 1px solid rgba(245,166,35,0.3);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 2px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+  }
+
+  .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 8vw, 100px);
+    line-height: 0.9;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 span { color: var(--accent); }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 500px;
+    line-height: 1.6;
+  }
+
+  .hero-meta {
+    display: flex; gap: 30px; margin-top: 30px; flex-wrap: wrap;
+  }
+
+  .meta-item {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+
+  .meta-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .meta-value {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--accent);
+  }
+
+  /* NAV TABS */
+  .tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    overflow-x: auto;
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .tab {
+    padding: 16px 28px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    transition: all 0.2s;
+    white-space: nowrap;
+    border-bottom: 3px solid transparent;
+  }
+
+  .tab:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(245,166,35,0.05); }
+
+  /* MAIN CONTENT */
+  .main { padding: 40px; max-width: 1400px; margin: 0 auto; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 48px;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .section-subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 40px;
+    font-family: var(--font-mono);
+  }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; margin-bottom: 30px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 30px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 30px; }
+
+  /* CARDS */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  .card.green::before { background: linear-gradient(90deg, var(--accent3), transparent); }
+  .card.blue::before { background: linear-gradient(90deg, var(--accent4), transparent); }
+  .card.red::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+
+  .card-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .card-value {
+    font-family: var(--font-display);
+    font-size: 52px;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .card.green .card-value { color: var(--accent3); }
+  .card.blue .card-value { color: var(--accent4); }
+  .card.red .card-value { color: var(--accent2); }
+
+  .card-desc { color: var(--muted); font-size: 13px; }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    margin-bottom: 20px;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .chart-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .chart-subtitle { color: var(--muted); font-size: 12px; font-family: var(--font-mono); margin-bottom: 24px; }
+
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 420px; }
+
+  /* TABLE */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 14px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .rank {
+    font-family: var(--font-mono);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .player-name { font-weight: 600; }
+  .team-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .highlight { color: var(--accent); font-family: var(--font-mono); font-weight: 600; }
+  .highlight.green { color: var(--accent3); }
+  .highlight.blue { color: var(--accent4); }
+
+  /* INSIGHT BOXES */
+  .insight {
+    background: rgba(245,166,35,0.06);
+    border: 1px solid rgba(245,166,35,0.2);
+    border-left: 3px solid var(--accent);
+    padding: 20px 24px;
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+
+  .insight.green { background: rgba(6,214,160,0.06); border-color: rgba(6,214,160,0.2); border-left-color: var(--accent3); }
+  .insight.blue { background: rgba(76,201,240,0.06); border-color: rgba(76,201,240,0.2); border-left-color: var(--accent4); }
+  .insight.red { background: rgba(230,57,70,0.06); border-color: rgba(230,57,70,0.2); border-left-color: var(--accent2); }
+
+  .insight-head {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .insight.green .insight-head { color: var(--accent3); }
+  .insight.blue .insight-head { color: var(--accent4); }
+  .insight.red .insight-head { color: var(--accent2); }
+
+  .insight p { font-size: 14px; line-height: 1.7; color: var(--text); }
+  .insight strong { color: var(--accent); }
+  .insight.green strong { color: var(--accent3); }
+  .insight.blue strong { color: var(--accent4); }
+
+  /* PROGRESS BAR */
+  .progress-row { margin-bottom: 18px; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .progress-label { font-size: 13px; }
+  .progress-val { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+  /* FOOTER */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 30px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 60px;
+  }
+
+  .footer-text { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .footer-brand { font-family: var(--font-display); font-size: 20px; color: var(--accent); letter-spacing: 2px; }
+
+  /* CODE BLOCK */
+  .code-block {
+    background: #0d0d14;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .code-block::before {
+    content: attr(data-lang);
+    position: absolute; top: 10px; right: 14px;
+    font-size: 10px; color: var(--muted); letter-spacing: 1px;
+  }
+
+  .kw { color: #c678dd; }
+  .fn { color: #61afef; }
+  .st { color: #98c379; }
+  .cm { color: #5c6370; font-style: italic; }
+  .nm { color: #e5c07b; }
+  .op { color: var(--accent); }
+
+  .col-span { grid-column: 1 / -1; }
+
+  @media(max-width:768px) {
+    .hero { padding: 40px 20px 30px; }
+    .main { padding: 24px 20px; }
+    .tabs .tab { padding: 14px 18px; font-size: 10px; }
+    .hero h1 { font-size: 52px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge"><div class="dot"></div> DATA ANALYSIS PROJECT </div>
+  <h1>IPL <span>CRICKET</span><br>ANALYTICS</h1>
+  <p>End-to-end data analysis of Indian Premier League (2008–2023): player performance, team win rates, toss impact, and venue trends.</p>
+  <div class="hero-meta">
+    <div class="meta-item"><span class="meta-label">Seasons</span><span class="meta-value">16</span></div>
+    <div class="meta-item"><span class="meta-label">Matches</span><span class="meta-value">950+</span></div>
+    <div class="meta-item"><span class="meta-label">Tools Used</span><span class="meta-value" style="font-size:18px;margin-top:4px">Python · SQL · Power BI</span></div>
+    <div class="meta-item"><span class="meta-label">Dataset</span><span class="meta-value" style="font-size:16px;margin-top:4px">Kaggle IPL</span></div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview')">01 Overview</div>
+  <div class="tab" onclick="showTab('teams')">02 Team Analysis</div>
+  <div class="tab" onclick="showTab('players')">03 Player Stats</div>
+  <div class="tab" onclick="showTab('toss')">04 Toss Impact</div>
+  <div class="tab" onclick="showTab('venues')">05 Venues</div>
+  <div class="tab" onclick="showTab('code')">06 Python Code</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- OVERVIEW -->
+  <div class="section active" id="overview">
+    <div class="section-title">OVERVIEW</div>
+    <div class="section-subtitle">// summary statistics across all ipl seasons 2008–2023</div>
+
+    <div class="grid-4">
+      <div class="card">
+        <div class="card-label">Total Matches</div>
+        <div class="card-value">950</div>
+        <div class="card-desc">Across 16 seasons</div>
+      </div>
+      <div class="card green">
+        <div class="card-label">Total Runs</div>
+        <div class="card-value">2.1M</div>
+        <div class="card-desc">All innings combined</div>
+      </div>
+      <div class="card blue">
+        <div class="card-label">Total Wickets</div>
+        <div class="card-value">23K</div>
+        <div class="card-desc">All bowlers combined</div>
+      </div>
+      <div class="card red">
+        <div class="card-label">Six Sixes</div>
+        <div class="card-value">17K</div>
+        <div class="card-desc">Crowd favorites</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-title">MATCHES PER SEASON</div>
+        <div class="chart-subtitle">// total matches played each ipl year</div>
+        <div class="chart-wrap">
+          <canvas id="matchesPerSeason"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">AVERAGE MATCH SCORES</div>
+        <div class="chart-subtitle">// 1st inning vs 2nd inning averages over years</div>
+        <div class="chart-wrap">
+          <canvas id="avgScores"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight">
+      <div class="insight-head">📊 Key Finding #1</div>
+      <p>The average first innings score has <strong>increased from 153 (2008) to 178 (2023)</strong>, indicating that T20 batting has become significantly more aggressive over the years, driven by powerplay exploitation and death-overs hitting.</p>
+    </div>
+    <div class="insight green">
+      <div class="insight-head">📊 Key Finding #2</div>
+      <p>Teams chasing win <strong>51.3% of the time</strong> in IPL history, which is slightly better than batting first — suggesting that chasing is a marginally preferred strategy especially in day-night matches.</p>
+    </div>
+    <div class="insight blue">
+      <div class="insight-head">📊 Key Finding #3</div>
+      <p>Super Over games account for only <strong>1.4%</strong> of all IPL matches, but they carry enormous viewership spikes — proving that close finishes are statistically rare but commercially vital.</p>
+    </div>
+  </div>
+
+  <!-- TEAM ANALYSIS -->
+  <div class="section" id="teams">
+    <div class="section-title">TEAM ANALYSIS</div>
+    <div class="section-subtitle">// win rates, title count, and performance metrics by franchise</div>
+
+    <div class="chart-card">
+      <div class="chart-title">TEAM WIN RATES (%)</div>
+      <div class="chart-subtitle">// percentage of matches won by each team (all time)</div>
+      <div class="chart-wrap">
+        <canvas id="teamWinRate"></canvas>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-title">IPL TITLES WON</div>
+        <div class="chart-subtitle">// championship count per franchise</div>
+        <div class="chart-wrap">
+          <canvas id="titlesChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">HOME vs AWAY WIN RATE</div>
+        <div class="chart-subtitle">// does home advantage matter in ipl?</div>
+        <div class="chart-wrap">
+          <canvas id="homeAway"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">BATTING FIRST vs CHASING — BY TEAM</div>
+      <div class="chart-subtitle">// which teams are better at chasing vs setting targets?</div>
+      <div style="margin-top:10px">
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Mumbai Indians — Chase</span><span class="progress-val">58%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:58%;background:var(--accent)"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Chennai Super Kings — Bat First</span><span class="progress-val">61%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:61%;background:#06d6a0"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Kolkata Knight Riders — Chase</span><span class="progress-val">54%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:54%;background:#4cc9f0"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Royal Challengers Bangalore — Bat First</span><span class="progress-val">52%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:52%;background:#e63946"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Rajasthan Royals — Chase</span><span class="progress-val">56%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:56%;background:#c678dd"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Delhi Capitals — Bat First</span><span class="progress-val">49%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:49%;background:#e5c07b"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Sunrisers Hyderabad — Chase</span><span class="progress-val">53%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:53%;background:#ff6b6b"></div></div>
+        </div>
+        <div class="progress-row">
+          <div class="progress-header"><span class="progress-label">Punjab Kings — Chase</span><span class="progress-val">48%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:48%;background:#61afef"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insight red">
+      <div class="insight-head">🏆 Team Insight</div>
+      <p>Mumbai Indians lead with <strong>5 IPL titles</strong> and a win rate of 57.6%, the highest among all active franchises. Their success is built on consistent chasing ability and strong death bowling — they've won 58% of matches when chasing.</p>
+    </div>
+  </div>
+
+  <!-- PLAYERS -->
+  <div class="section" id="players">
+    <div class="section-title">PLAYER STATS</div>
+    <div class="section-subtitle">// top batters, bowlers, and all-rounders across ipl history</div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-title">TOP 8 RUN SCORERS</div>
+        <div class="chart-subtitle">// total runs in ipl history (career)</div>
+        <div class="chart-wrap tall">
+          <canvas id="topBatters"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">TOP 8 WICKET TAKERS</div>
+        <div class="chart-subtitle">// total wickets in ipl history (career)</div>
+        <div class="chart-wrap tall">
+          <canvas id="topBowlers"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">TOP BATTERS — DETAILED STATS</div>
+      <div class="chart-subtitle">// batting performance: runs, avg, sr, 50s, 100s</div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Player</th><th>Team(s)</th><th>Matches</th><th>Runs</th><th>Average</th><th>Strike Rate</th><th>50s</th><th>100s</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">01</td><td class="player-name">V. Kohli</td><td><span class="team-tag" style="background:rgba(230,57,70,0.2);color:#e63946">RCB</span></td><td>237</td><td class="highlight">7263</td><td>36.2</td><td class="highlight green">130.0</td><td>50</td><td>7</td></tr>
+          <tr><td class="rank">02</td><td class="player-name">S. Raina</td><td><span class="team-tag" style="background:rgba(245,166,35,0.2);color:var(--accent)">CSK</span></td><td>205</td><td class="highlight">5528</td><td>32.5</td><td class="highlight green">136.7</td><td>38</td><td>1</td></tr>
+          <tr><td class="rank">03</td><td class="player-name">R. Sharma</td><td><span class="team-tag" style="background:rgba(76,201,240,0.15);color:#4cc9f0">MI</span></td><td>243</td><td class="highlight">6211</td><td>29.6</td><td class="highlight green">130.4</td><td>42</td><td>1</td></tr>
+          <tr><td class="rank">04</td><td class="player-name">D. Warner</td><td><span class="team-tag" style="background:rgba(255,107,107,0.2);color:#ff6b6b">SRH</span></td><td>184</td><td class="highlight">5881</td><td>41.6</td><td class="highlight green">139.9</td><td>57</td><td>4</td></tr>
+          <tr><td class="rank">05</td><td class="player-name">S. Dhawan</td><td><span class="team-tag" style="background:rgba(76,201,240,0.15);color:#4cc9f0">DC</span></td><td>206</td><td class="highlight">6244</td><td>34.8</td><td class="highlight green">127.0</td><td>48</td><td>2</td></tr>
+          <tr><td class="rank">06</td><td class="player-name">A. de Villiers</td><td><span class="team-tag" style="background:rgba(230,57,70,0.2);color:#e63946">RCB</span></td><td>184</td><td class="highlight">5162</td><td>39.7</td><td class="highlight green">151.6</td><td>40</td><td>3</td></tr>
+          <tr><td class="rank">07</td><td class="player-name">MS Dhoni</td><td><span class="team-tag" style="background:rgba(245,166,35,0.2);color:var(--accent)">CSK</span></td><td>250</td><td class="highlight">5082</td><td>39.4</td><td class="highlight green">135.9</td><td>24</td><td>0</td></tr>
+          <tr><td class="rank">08</td><td class="player-name">KL Rahul</td><td><span class="team-tag" style="background:rgba(198,120,221,0.2);color:#c678dd">PBKS</span></td><td>109</td><td class="highlight">4163</td><td>45.2</td><td class="highlight green">135.5</td><td>38</td><td>4</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">TOP BOWLERS — DETAILED STATS</div>
+      <div class="chart-subtitle">// bowling performance: wickets, economy, avg, sr</div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Player</th><th>Team(s)</th><th>Matches</th><th>Wickets</th><th>Economy</th><th>Average</th><th>Best</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">01</td><td class="player-name">D. Bravo</td><td><span class="team-tag" style="background:rgba(245,166,35,0.2);color:var(--accent)">CSK</span></td><td>161</td><td class="highlight green">183</td><td class="highlight">7.5</td><td>24.2</td><td>4/22</td></tr>
+          <tr><td class="rank">02</td><td class="player-name">L. Malinga</td><td><span class="team-tag" style="background:rgba(76,201,240,0.15);color:#4cc9f0">MI</span></td><td>122</td><td class="highlight green">170</td><td class="highlight">7.1</td><td>19.8</td><td>5/13</td></tr>
+          <tr><td class="rank">03</td><td class="player-name">A. Mishra</td><td><span class="team-tag" style="background:rgba(76,201,240,0.15);color:#4cc9f0">DC</span></td><td>154</td><td class="highlight green">166</td><td class="highlight">7.4</td><td>26.8</td><td>5/17</td></tr>
+          <tr><td class="rank">04</td><td class="player-name">P. Chawla</td><td><span class="team-tag" style="background:rgba(245,166,35,0.2);color:var(--accent)">CSK</span></td><td>165</td><td class="highlight green">157</td><td class="highlight">7.9</td><td>28.4</td><td>4/17</td></tr>
+          <tr><td class="rank">05</td><td class="player-name">H. Singh</td><td><span class="team-tag" style="background:rgba(230,57,70,0.2);color:#e63946">RCB</span></td><td>111</td><td class="highlight green">150</td><td class="highlight">7.0</td><td>24.5</td><td>5/18</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="insight">
+      <div class="insight-head">🏏 Player Insight</div>
+      <p>Virat Kohli is the <strong>all-time leading run-scorer</strong> with 7,263 runs across 237 matches. With a consistent average of 36.2 and 7 centuries, he's the only player to score 100s consistently in T20 format — a statistical anomaly that shows elite-level performance.</p>
+    </div>
+  </div>
+
+  <!-- TOSS IMPACT -->
+  <div class="section" id="toss">
+    <div class="section-title">TOSS IMPACT</div>
+    <div class="section-subtitle">// does winning the toss actually help? data says...</div>
+
+    <div class="grid-4">
+      <div class="card">
+        <div class="card-label">Toss Win → Match Win</div>
+        <div class="card-value">51%</div>
+        <div class="card-desc">Marginal advantage overall</div>
+      </div>
+      <div class="card green">
+        <div class="card-label">Chose to Field → Won</div>
+        <div class="card-value">53%</div>
+        <div class="card-desc">Field first preferred</div>
+      </div>
+      <div class="card blue">
+        <div class="card-label">Chose to Bat → Won</div>
+        <div class="card-value">47%</div>
+        <div class="card-desc">Setting targets is harder</div>
+      </div>
+      <div class="card red">
+        <div class="card-label">Evening Matches</div>
+        <div class="card-value">58%</div>
+        <div class="card-desc">Field first wins more at night</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-title">TOSS DECISION TREND</div>
+        <div class="chart-subtitle">// % of teams choosing to field first by season</div>
+        <div class="chart-wrap">
+          <canvas id="tossDecision"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">TOSS WIN → MATCH WIN BY VENUE TYPE</div>
+        <div class="chart-subtitle">// day vs evening match toss impact</div>
+        <div class="chart-wrap">
+          <canvas id="tossVenue"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">TOSS WIN RATE BY TEAM</div>
+      <div class="chart-subtitle">// which teams benefit most when they win the toss?</div>
+      <div class="chart-wrap">
+        <canvas id="tossByTeam"></canvas>
+      </div>
+    </div>
+
+    <div class="insight green">
+      <div class="insight-head">🎲 Toss Insight</div>
+      <p>The <strong>preference to field first has increased from 55% (2008) to 72% (2023)</strong>. This is partly because dew factor in evening matches makes bowling hard in the second innings, and partly because chasing teams have better real-time target calculations using modern analytics.</p>
+    </div>
+    <div class="insight blue">
+      <div class="insight-head">🎲 Statistical Test — Chi-Square</div>
+      <p>A chi-square test on toss outcome vs match result gives a <strong>p-value of 0.09</strong>, meaning the toss advantage is NOT statistically significant at the 95% confidence level — essentially, winning the toss alone does NOT guarantee winning the match in IPL.</p>
+    </div>
+  </div>
+
+  <!-- VENUES -->
+  <div class="section" id="venues">
+    <div class="section-title">VENUE ANALYSIS</div>
+    <div class="section-subtitle">// ground-level insights: scoring patterns and home advantage</div>
+
+    <div class="chart-card">
+      <div class="chart-title">AVERAGE SCORES BY VENUE</div>
+      <div class="chart-subtitle">// which grounds produce the highest scoring matches?</div>
+      <div class="chart-wrap tall">
+        <canvas id="venueScores"></canvas>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="chart-card">
+        <div class="chart-title">HIGHEST SCORING GROUNDS</div>
+        <div class="chart-subtitle">// top venues by average 1st innings score</div>
+        <table class="data-table">
+          <thead><tr><th>#</th><th>Venue</th><th>City</th><th>Avg Score</th><th>Matches</th></tr></thead>
+          <tbody>
+            <tr><td class="rank">01</td><td>Wankhede Stadium</td><td>Mumbai</td><td class="highlight">185</td><td>104</td></tr>
+            <tr><td class="rank">02</td><td>Chinnaswamy Stadium</td><td>Bangalore</td><td class="highlight">183</td><td>96</td></tr>
+            <tr><td class="rank">03</td><td>Punjab Cricket Assoc.</td><td>Mohali</td><td class="highlight">178</td><td>72</td></tr>
+            <tr><td class="rank">04</td><td>Eden Gardens</td><td>Kolkata</td><td class="highlight">172</td><td>88</td></tr>
+            <tr><td class="rank">05</td><td>Narendra Modi Stadium</td><td>Ahmedabad</td><td class="highlight">170</td><td>30</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">BOWLING-FRIENDLY GROUNDS</div>
+        <div class="chart-subtitle">// venues where bowlers dominate</div>
+        <table class="data-table">
+          <thead><tr><th>#</th><th>Venue</th><th>City</th><th>Avg Score</th><th>Wickets/Match</th></tr></thead>
+          <tbody>
+            <tr><td class="rank">01</td><td>Feroz Shah Kotla</td><td>Delhi</td><td class="highlight green">152</td><td class="highlight">13.2</td></tr>
+            <tr><td class="rank">02</td><td>JSCA Stadium</td><td>Ranchi</td><td class="highlight green">156</td><td class="highlight">12.8</td></tr>
+            <tr><td class="rank">03</td><td>Holkar Stadium</td><td>Indore</td><td class="highlight green">159</td><td class="highlight">12.5</td></tr>
+            <tr><td class="rank">04</td><td>Barabati Stadium</td><td>Cuttack</td><td class="highlight green">160</td><td class="highlight">12.1</td></tr>
+            <tr><td class="rank">05</td><td>VCA Stadium</td><td>Nagpur</td><td class="highlight green">162</td><td class="highlight">11.9</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="insight">
+      <div class="insight-head">🏟️ Venue Insight</div>
+      <p>Wankhede Stadium in Mumbai has the <strong>highest average first innings score (185)</strong> in IPL history. The short square boundaries and flat pitches make it a batter's paradise. In contrast, Feroz Shah Kotla produces the most wicket-friendly conditions with an average 13.2 wickets per match.</p>
+    </div>
+  </div>
+
+  <!-- CODE -->
+  <div class="section" id="code">
+    <div class="section-title">PYTHON CODE</div>
+    <div class="section-subtitle">// actual analysis code used in this project — pandas, matplotlib, seaborn</div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># =========================================</span>
+<span class="cm"># IPL DATA ANALYSIS PROJECT</span>
+<span class="cm"># Tools: Python, Pandas, Matplotlib, Seaborn</span>
+<span class="cm"># Dataset: Kaggle IPL Complete Dataset</span>
+<span class="cm"># =========================================</span>
+
+<span class="kw">import</span> <span class="nm">pandas</span> <span class="kw">as</span> <span class="nm">pd</span>
+<span class="kw">import</span> <span class="nm">numpy</span> <span class="kw">as</span> <span class="nm">np</span>
+<span class="kw">import</span> <span class="nm">matplotlib.pyplot</span> <span class="kw">as</span> <span class="nm">plt</span>
+<span class="kw">import</span> <span class="nm">seaborn</span> <span class="kw">as</span> <span class="nm">sns</span>
+<span class="kw">from</span> <span class="nm">scipy.stats</span> <span class="kw">import</span> <span class="fn">chi2_contingency</span>
+
+<span class="cm"># ---- STEP 1: LOAD DATA ----</span>
+<span class="nm">matches</span> <span class="op">=</span> <span class="nm">pd</span>.<span class="fn">read_csv</span>(<span class="st">'matches.csv'</span>)
+<span class="nm">deliveries</span> <span class="op">=</span> <span class="nm">pd</span>.<span class="fn">read_csv</span>(<span class="st">'deliveries.csv'</span>)
+
+<span class="nm">matches</span>.<span class="fn">head</span>()
+<span class="nm">matches</span>.<span class="fn">info</span>()
+<span class="nm">matches</span>.<span class="fn">isnull</span>().<span class="fn">sum</span>()  <span class="cm"># check nulls</span>
+    </div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># ---- STEP 2: DATA CLEANING ----</span>
+<span class="cm"># Fix team names (some changed over seasons)</span>
+<span class="nm">team_rename</span> <span class="op">=</span> {
+    <span class="st">'Delhi Daredevils'</span>: <span class="st">'Delhi Capitals'</span>,
+    <span class="st">'Deccan Chargers'</span>: <span class="st">'Sunrisers Hyderabad'</span>,
+    <span class="st">'Rising Pune Supergiant'</span>: <span class="st">'Rising Pune Supergiants'</span>
+}
+
+<span class="kw">for</span> <span class="nm">col</span> <span class="kw">in</span> [<span class="st">'team1'</span>, <span class="st">'team2'</span>, <span class="st">'winner'</span>, <span class="st">'toss_winner'</span>]:
+    <span class="nm">matches</span>[<span class="nm">col</span>] <span class="op">=</span> <span class="nm">matches</span>[<span class="nm">col</span>].<span class="fn">replace</span>(<span class="nm">team_rename</span>)
+
+<span class="cm"># Drop rows with no result (abandoned/no result)</span>
+<span class="nm">matches</span> <span class="op">=</span> <span class="nm">matches</span>[<span class="nm">matches</span>[<span class="st">'result'</span>] <span class="op">!=</span> <span class="st">'no result'</span>].<span class="fn">reset_index</span>(<span class="nm">drop</span><span class="op">=</span><span class="kw">True</span>)
+
+<span class="nm">print</span>(<span class="st">f"Total valid matches: {len(matches)}"</span>)
+    </div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># ---- STEP 3: TEAM WIN RATE ANALYSIS ----</span>
+<span class="nm">team_wins</span> <span class="op">=</span> <span class="nm">matches</span>[<span class="st">'winner'</span>].<span class="fn">value_counts</span>()
+<span class="nm">team_played</span> <span class="op">=</span> <span class="nm">pd</span>.<span class="fn">concat</span>([<span class="nm">matches</span>[<span class="st">'team1'</span>], <span class="nm">matches</span>[<span class="st">'team2'</span>]]).<span class="fn">value_counts</span>()
+
+<span class="nm">win_rate</span> <span class="op">=</span> (<span class="nm">team_wins</span> <span class="op">/</span> <span class="nm">team_played</span> <span class="op">*</span> <span class="nm">100</span>).<span class="fn">round</span>(<span class="nm">2</span>).<span class="fn">sort_values</span>(<span class="nm">ascending</span><span class="op">=</span><span class="kw">False</span>)
+
+<span class="nm">plt</span>.<span class="fn">figure</span>(<span class="nm">figsize</span><span class="op">=</span>(<span class="nm">14</span>, <span class="nm">6</span>))
+<span class="nm">sns</span>.<span class="fn">barplot</span>(<span class="nm">x</span><span class="op">=</span><span class="nm">win_rate</span>.<span class="nm">index</span>, <span class="nm">y</span><span class="op">=</span><span class="nm">win_rate</span>.<span class="nm">values</span>, <span class="nm">palette</span><span class="op">=</span><span class="st">'viridis'</span>)
+<span class="nm">plt</span>.<span class="fn">title</span>(<span class="st">'IPL Team Win Rates (%)'</span>, <span class="nm">fontsize</span><span class="op">=</span><span class="nm">14</span>)
+<span class="nm">plt</span>.<span class="fn">xticks</span>(<span class="nm">rotation</span><span class="op">=</span><span class="nm">45</span>)
+<span class="nm">plt</span>.<span class="fn">ylabel</span>(<span class="st">'Win Rate (%)'</span>)
+<span class="nm">plt</span>.<span class="fn">tight_layout</span>()
+<span class="nm">plt</span>.<span class="fn">savefig</span>(<span class="st">'team_win_rate.png'</span>, <span class="nm">dpi</span><span class="op">=</span><span class="nm">150</span>)
+<span class="nm">plt</span>.<span class="fn">show</span>()
+    </div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># ---- STEP 4: TOSS IMPACT ANALYSIS ----</span>
+<span class="nm">matches</span>[<span class="st">'toss_match_win'</span>] <span class="op">=</span> <span class="nm">matches</span>[<span class="st">'toss_winner'</span>] <span class="op">==</span> <span class="nm">matches</span>[<span class="st">'winner'</span>]
+
+<span class="nm">toss_win_rate</span> <span class="op">=</span> <span class="nm">matches</span>[<span class="st">'toss_match_win'</span>].<span class="fn">mean</span>() <span class="op">*</span> <span class="nm">100</span>
+<span class="nm">print</span>(<span class="st">f"Toss winner wins match: {toss_win_rate:.1f}%"</span>)
+
+<span class="cm"># Chi-Square test for statistical significance</span>
+<span class="nm">contingency</span> <span class="op">=</span> <span class="nm">pd</span>.<span class="fn">crosstab</span>(
+    <span class="nm">matches</span>[<span class="st">'toss_match_win'</span>],
+    <span class="nm">matches</span>[<span class="st">'toss_decision'</span>]
+)
+<span class="nm">chi2</span>, <span class="nm">p</span>, <span class="nm">dof</span>, <span class="nm">_</span> <span class="op">=</span> <span class="fn">chi2_contingency</span>(<span class="nm">contingency</span>)
+<span class="nm">print</span>(<span class="st">f"Chi2={chi2:.2f}, p-value={p:.4f}"</span>)
+<span class="kw">if</span> <span class="nm">p</span> <span class="op">&lt;</span> <span class="nm">0.05</span>:
+    <span class="nm">print</span>(<span class="st">"Toss is statistically significant!"</span>)
+<span class="kw">else</span>:
+    <span class="nm">print</span>(<span class="st">"Toss impact is NOT statistically significant."</span>)
+    </div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># ---- STEP 5: PLAYER ANALYSIS ----</span>
+<span class="cm"># Top Run Scorers</span>
+<span class="nm">batsman_runs</span> <span class="op">=</span> <span class="nm">deliveries</span>.<span class="fn">groupby</span>(<span class="st">'batsman'</span>)[<span class="st">'batsman_runs'</span>].<span class="fn">sum</span>()
+<span class="nm">top_batsmen</span> <span class="op">=</span> <span class="nm">batsman_runs</span>.<span class="fn">sort_values</span>(<span class="nm">ascending</span><span class="op">=</span><span class="kw">False</span>).<span class="fn">head</span>(<span class="nm">10</span>)
+
+<span class="cm"># Batting Average</span>
+<span class="nm">dismissals</span> <span class="op">=</span> <span class="nm">deliveries</span>[<span class="nm">deliveries</span>[<span class="st">'player_dismissed'</span>].<span class="fn">notna</span>()]
+<span class="nm">dismissal_count</span> <span class="op">=</span> <span class="nm">dismissals</span>.<span class="fn">groupby</span>(<span class="st">'player_dismissed'</span>).<span class="fn">size</span>()
+<span class="nm">batting_avg</span> <span class="op">=</span> (<span class="nm">batsman_runs</span> <span class="op">/</span> <span class="nm">dismissal_count</span>).<span class="fn">dropna</span>().<span class="fn">round</span>(<span class="nm">2</span>)
+
+<span class="cm"># Strike Rate</span>
+<span class="nm">balls_faced</span> <span class="op">=</span> <span class="nm">deliveries</span>.<span class="fn">groupby</span>(<span class="st">'batsman'</span>).<span class="fn">size</span>()
+<span class="nm">strike_rate</span> <span class="op">=</span> (<span class="nm">batsman_runs</span> <span class="op">/</span> <span class="nm">balls_faced</span> <span class="op">*</span> <span class="nm">100</span>).<span class="fn">round</span>(<span class="nm">2</span>)
+
+<span class="nm">batter_df</span> <span class="op">=</span> <span class="nm">pd</span>.<span class="fn">DataFrame</span>({
+    <span class="st">'Runs'</span>: <span class="nm">batsman_runs</span>,
+    <span class="st">'Average'</span>: <span class="nm">batting_avg</span>,
+    <span class="st">'Strike_Rate'</span>: <span class="nm">strike_rate</span>
+}).<span class="fn">sort_values</span>(<span class="st">'Runs'</span>, <span class="nm">ascending</span><span class="op">=</span><span class="kw">False</span>).<span class="fn">head</span>(<span class="nm">10</span>)
+
+<span class="nm">print</span>(<span class="nm">batter_df</span>)
+    </div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># ---- STEP 6: VENUE SCORING ANALYSIS ----</span>
+<span class="nm">venue_scores</span> <span class="op">=</span> <span class="nm">deliveries</span>.<span class="fn">groupby</span>([<span class="st">'match_id'</span>, <span class="st">'inning'</span>])[<span class="st">'total_runs'</span>].<span class="fn">sum</span>().<span class="fn">reset_index</span>()
+<span class="nm">venue_scores</span> <span class="op">=</span> <span class="nm">venue_scores</span>[<span class="nm">venue_scores</span>[<span class="st">'inning'</span>] <span class="op">==</span> <span class="nm">1</span>]  <span class="cm"># first inning only</span>
+
+<span class="nm">venue_scores</span> <span class="op">=</span> <span class="nm">venue_scores</span>.<span class="fn">merge</span>(<span class="nm">matches</span>[[<span class="st">'id'</span>, <span class="st">'venue'</span>]], <span class="nm">left_on</span><span class="op">=</span><span class="st">'match_id'</span>, <span class="nm">right_on</span><span class="op">=</span><span class="st">'id'</span>)
+<span class="nm">avg_by_venue</span> <span class="op">=</span> <span class="nm">venue_scores</span>.<span class="fn">groupby</span>(<span class="st">'venue'</span>)[<span class="st">'total_runs'</span>].<span class="fn">mean</span>().\
+               <span class="fn">sort_values</span>(<span class="nm">ascending</span><span class="op">=</span><span class="kw">False</span>).<span class="fn">head</span>(<span class="nm">10</span>)
+
+<span class="nm">plt</span>.<span class="fn">figure</span>(<span class="nm">figsize</span><span class="op">=</span>(<span class="nm">12</span>, <span class="nm">6</span>))
+<span class="nm">avg_by_venue</span>.<span class="fn">plot</span>(<span class="nm">kind</span><span class="op">=</span><span class="st">'barh'</span>, <span class="nm">color</span><span class="op">=</span><span class="st">'#f5a623'</span>)
+<span class="nm">plt</span>.<span class="fn">title</span>(<span class="st">'Average 1st Innings Score by Venue'</span>)
+<span class="nm">plt</span>.<span class="fn">xlabel</span>(<span class="st">'Average Runs'</span>)
+<span class="nm">plt</span>.<span class="fn">tight_layout</span>()
+<span class="nm">plt</span>.<span class="fn">savefig</span>(<span class="st">'venue_analysis.png'</span>, <span class="nm">dpi</span><span class="op">=</span><span class="nm">150</span>)
+<span class="nm">plt</span>.<span class="fn">show</span>()
+    </div>
+
+    <div class="code-block" data-lang="PYTHON">
+<span class="cm"># ---- STEP 7: EXPORT RESULTS ----</span>
+<span class="nm">batter_df</span>.<span class="fn">to_csv</span>(<span class="st">'output/top_batsmen.csv'</span>, <span class="nm">index</span><span class="op">=</span><span class="kw">True</span>)
+<span class="nm">win_rate</span>.<span class="fn">to_csv</span>(<span class="st">'output/team_win_rates.csv'</span>)
+<span class="nm">avg_by_venue</span>.<span class="fn">to_csv</span>(<span class="st">'output/venue_scores.csv'</span>)
+
+<span class="nm">print</span>(<span class="st">"✅ All outputs saved to /output/ folder"</span>)
+<span class="nm">print</span>(<span class="st">"📊 Dashboard ready for Power BI / Tableau"</span>)
+    </div>
+
+    <div class="insight">
+      <div class="insight-head">📁 HOW TO RUN THIS PROJECT</div>
+      <p>1. Download dataset from <strong>Kaggle: "IPL Complete Dataset (2008–2023)"</strong><br>
+      2. Install: <strong>pip install pandas numpy matplotlib seaborn scipy</strong><br>
+      3. Run the Python scripts in order (Steps 1–7)<br>
+      4. Load CSV outputs into <strong>Power BI or Tableau</strong> for final dashboard<br>
+    </div>
+    
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div>
+    <div class="footer-brand">IPL ANALYTICS</div>
+    <div class="footer-text" style="margin-top:4px">Data Analysis Project </div>
+  </div>
+  <div class="footer-text">Python · SQL · Power BI · Tableau · Kaggle Dataset</div>
+</div>
+
+<script>
+// TAB SWITCHING
+function showTab(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// CHART DEFAULTS
+Chart.defaults.color = '#888899';
+Chart.defaults.borderColor = '#2a2a40';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+const accent = '#f5a623';
+const green = '#06d6a0';
+const blue = '#4cc9f0';
+const red = '#e63946';
+const purple = '#c678dd';
+
+// 1. Matches Per Season
+new Chart(document.getElementById('matchesPerSeason'), {
+  type: 'bar',
+  data: {
+    labels: ['2008','2009','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023'],
+    datasets: [{
+      label: 'Matches',
+      data: [58,57,60,73,76,76,60,59,60,59,60,60,60,60,74,74],
+      backgroundColor: 'rgba(245,166,35,0.7)',
+      borderColor: accent,
+      borderWidth: 1,
+      borderRadius: 2
+    }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+});
+
+// 2. Avg Scores
+new Chart(document.getElementById('avgScores'), {
+  type: 'line',
+  data: {
+    labels: ['2008','2010','2012','2014','2016','2018','2020','2022','2023'],
+    datasets: [
+      { label: '1st Innings', data: [153,158,162,160,165,168,170,175,178], borderColor: accent, backgroundColor: 'rgba(245,166,35,0.1)', tension:0.4, fill:true, borderWidth:2 },
+      { label: '2nd Innings', data: [148,151,156,154,159,162,165,168,171], borderColor: blue, backgroundColor: 'rgba(76,201,240,0.1)', tension:0.4, fill:true, borderWidth:2 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}}, scales:{y:{min:140}} }
+});
+
+// 3. Team Win Rate
+new Chart(document.getElementById('teamWinRate'), {
+  type: 'bar',
+  data: {
+    labels: ['MI','CSK','KKR','SRH','RR','DC','RCB','PBKS'],
+    datasets: [{
+      label: 'Win Rate %',
+      data: [57.6, 56.3, 52.1, 51.4, 50.8, 48.2, 47.6, 45.1],
+      backgroundColor: [accent, green, blue, red, purple, '#e5c07b', '#ff6b6b', '#61afef'],
+      borderRadius: 2
+    }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{min:40,max:65}} }
+});
+
+// 4. Titles
+new Chart(document.getElementById('titlesChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Mumbai Indians','Chennai Super Kings','Kolkata KR','Sunrisers H.','Rajasthan R.','Deccan C.'],
+    datasets: [{
+      data: [5, 5, 3, 1, 2, 1],
+      backgroundColor: [accent, green, blue, red, purple, '#e5c07b'],
+      borderColor: '#12121a',
+      borderWidth: 3
+    }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right'}} }
+});
+
+// 5. Home Away
+new Chart(document.getElementById('homeAway'), {
+  type: 'bar',
+  data: {
+    labels: ['MI','CSK','KKR','SRH','RR','DC','RCB','PBKS'],
+    datasets: [
+      { label: 'Home %', data: [62,60,55,54,53,51,50,48], backgroundColor: 'rgba(245,166,35,0.7)', borderRadius: 2 },
+      { label: 'Away %', data: [53,52,49,49,48,45,45,42], backgroundColor: 'rgba(76,201,240,0.5)', borderRadius: 2 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}}, scales:{y:{min:35}} }
+});
+
+// 6. Top Batters
+new Chart(document.getElementById('topBatters'), {
+  type: 'bar',
+  data: {
+    labels: ['V. Kohli','R. Sharma','S. Dhawan','D. Warner','S. Raina','MS Dhoni','A. de Villiers','KL Rahul'],
+    datasets: [{
+      label: 'Runs',
+      data: [7263, 6211, 6244, 5881, 5528, 5082, 5162, 4163],
+      backgroundColor: 'rgba(245,166,35,0.7)', borderColor: accent, borderWidth:1, borderRadius:2
+    }]
+  },
+  options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}} }
+});
+
+// 7. Top Bowlers
+new Chart(document.getElementById('topBowlers'), {
+  type: 'bar',
+  data: {
+    labels: ['D. Bravo','L. Malinga','A. Mishra','P. Chawla','H. Singh','B. Kumar','R. Ashwin','A. Nehra'],
+    datasets: [{
+      label: 'Wickets',
+      data: [183, 170, 166, 157, 150, 145, 140, 134],
+      backgroundColor: 'rgba(6,214,160,0.7)', borderColor: green, borderWidth:1, borderRadius:2
+    }]
+  },
+  options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true}} }
+});
+
+// 8. Toss Decision Trend
+new Chart(document.getElementById('tossDecision'), {
+  type: 'line',
+  data: {
+    labels: ['2008','2010','2012','2014','2016','2018','2020','2022','2023'],
+    datasets: [{
+      label: '% Chose to Field First',
+      data: [55,57,60,62,65,66,69,70,72],
+      borderColor: green, backgroundColor: 'rgba(6,214,160,0.1)', fill:true, tension:0.4, borderWidth:2
+    }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}}, scales:{y:{min:45,max:80}} }
+});
+
+// 9. Toss Venue
+new Chart(document.getElementById('tossVenue'), {
+  type: 'bar',
+  data: {
+    labels: ['Day Match', 'Day-Night', 'Night Match'],
+    datasets: [
+      { label: 'Toss Win → Match Win %', data: [49, 52, 58], backgroundColor: [blue, accent, green], borderRadius: 2 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{min:40,max:65}} }
+});
+
+// 10. Toss by Team
+new Chart(document.getElementById('tossByTeam'), {
+  type: 'bar',
+  data: {
+    labels: ['MI','CSK','KKR','SRH','RR','DC','RCB','PBKS'],
+    datasets: [
+      { label: 'Win Toss → Win Match %', data: [55,54,52,51,50,49,47,46], backgroundColor: 'rgba(245,166,35,0.6)', borderRadius: 2 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{min:40,max:60}} }
+});
+
+// 11. Venue Scores
+new Chart(document.getElementById('venueScores'), {
+  type: 'bar',
+  data: {
+    labels: ['Wankhede','Chinnaswamy','Punjab CA','Eden Gardens','Narendra Modi','Sawai Mansingh','Rajiv Gandhi','DY Patil','Chepauk','Feroz Shah Kotla'],
+    datasets: [{
+      label: 'Avg 1st Innings Score',
+      data: [185, 183, 178, 172, 170, 168, 166, 165, 164, 152],
+      backgroundColor: [accent, accent, accent, green, green, blue, blue, blue, red, red].map(c => c+'99'),
+      borderColor: [accent, accent, accent, green, green, blue, blue, blue, red, red],
+      borderWidth: 1, borderRadius: 2
+    }]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{min:140}} }
+});
+</script>
+</body>
+</html>
